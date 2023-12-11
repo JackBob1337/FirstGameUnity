@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.VisualScripting;
+using System;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -13,12 +14,20 @@ public class PlayerMovement : MonoBehaviour
     private SpriteRenderer sprite;
     private BoxCollider2D coll;
 
-    [SerializeField] private LayerMask jumpableGround;
+    
+    [Header("Move Info")]
     private float dirX = 0f;
     [SerializeField]private float moveSpeed = 7f;
     [SerializeField]private float jumpForce = 14f;
+    private int airJumpCount;
+    private int airJumpCountMax;
+    
+    [Header("Collision Info")]
+    [SerializeField] private LayerMask jumpableGround;
+   
+    
 
-    private enum Movementstate {idle, running, jumping, falling}
+    private enum Movementstate {idle, running, jumping, falling, doubleJump}
     
     // Start is called before the first frame update
     private void Start()
@@ -27,6 +36,7 @@ public class PlayerMovement : MonoBehaviour
         coll = GetComponent<BoxCollider2D>();
         anim = GetComponent<Animator>();
         sprite = GetComponent<SpriteRenderer>();
+        airJumpCountMax = 1;
     }
 
     // Update is called once per frame
@@ -37,11 +47,32 @@ public class PlayerMovement : MonoBehaviour
         rb.velocity = new Vector2(dirX * moveSpeed, rb.velocity.y);
         
         //jump
-        if (Input.GetButtonDown("Jump") && IsGrounded())
+        if (IsGrounded())
         {
-            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+            airJumpCount = 0;
+        }
+        //Noramal Jump
+        if (Input.GetButton("Jump"))
+        {
+            if (IsGrounded())
+            {
+                Jump();
+            } 
+            else 
+            {
+                //Double Jump
+                if (Input.GetButtonDown("Jump"))
+                {
+                    if (airJumpCount < airJumpCountMax)
+                    {
+                        Jump();
+                        airJumpCount++;
+                    }
+                }                    
+            }
         }
         UpdateAnimationUpdate();
+        
         
     }
 
@@ -68,12 +99,20 @@ public class PlayerMovement : MonoBehaviour
         
         if (rb.velocity.y > .1f)
         {
-            state = Movementstate.jumping; 
+            if (airJumpCount == 0 && rb.velocity.y != 0)
+            {
+                state = Movementstate.jumping;
+            }
+            else if (airJumpCount > 0)
+            {
+                state = Movementstate.doubleJump;
+            }
         }
-        else if (rb.velocity.y < -.1f)
+        else if (rb.velocity.y < -.01f)
         {
             state = Movementstate.falling;
         }
+        
         anim.SetInteger("state", (int)state);
     }
 
@@ -81,7 +120,10 @@ public class PlayerMovement : MonoBehaviour
     {
         return Physics2D.BoxCast(coll.bounds.center, coll.bounds.size, 0f, Vector2.down, .1f, jumpableGround);
     }
+
+  
+    private void Jump()
+    {
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+    }
 }
-
-
-
